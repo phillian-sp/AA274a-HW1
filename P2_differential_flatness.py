@@ -37,6 +37,28 @@ def compute_traj_coeffs(initial_state: State, final_state: State, tf: float) -> 
     """
     ########## Code starts here ##########
 
+    A = np.array([
+        [1, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 0, 0, 0],
+        [0, 1, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 0],
+        [1, tf, tf**2, tf**3, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, tf, tf**2, tf**3],
+        [0, 1, 2*tf, 3*tf**2, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1, 2*tf, 3*tf**2]
+    ])
+    b = np.array([
+        initial_state.x,
+        initial_state.y,
+        initial_state.xd,
+        initial_state.yd,
+        final_state.x,
+        final_state.y,
+        final_state.xd,
+        final_state.yd
+    ])
+    coeffs = np.linalg.solve(A, b)
+
     ########## Code ends here ##########
     return coeffs
 
@@ -55,6 +77,14 @@ def compute_traj(coeffs: np.ndarray, tf: float, N: int) -> T.Tuple[np.ndarray, n
     traj = np.zeros((N, 7))
     ########## Code starts here ##########
 
+    traj[:,0] = coeffs[0] + coeffs[1]*t + coeffs[2]*t**2 + coeffs[3]*t**3
+    traj[:,1] = coeffs[4] + coeffs[5]*t + coeffs[6]*t**2 + coeffs[7]*t**3
+    traj[:,3] = coeffs[1] + 2*coeffs[2]*t + 3*coeffs[3]*t**2
+    traj[:,4] = coeffs[5] + 2*coeffs[6]*t + 3*coeffs[7]*t**2
+    traj[:,5] = 2*coeffs[2] + 6*coeffs[3]*t
+    traj[:,6] = 2*coeffs[6] + 6*coeffs[7]*t
+    traj[:,2] = np.arctan2(traj[:,4], traj[:,3])
+
     ########## Code ends here ##########
 
     return t, traj
@@ -68,6 +98,18 @@ def compute_controls(traj: np.ndarray) -> T.Tuple[np.ndarray, np.ndarray]:
         om (np.array shape [N]) om at each point of traj
     """
     ########## Code starts here ##########
+
+    V = np.sqrt(traj[:,3]**2 + traj[:,4]**2)
+    M = np.array([
+        [np.cos(traj[:,2]), -V*np.sin(traj[:,2])],
+        [np.sin(traj[:,2]), V*np.cos(traj[:,2])]
+    ])
+    # change last two dimensions of M to be 2 * 2
+    M = np.moveaxis(M, -1, 0)
+    M_inv = np.linalg.inv(M)
+    traj_reshape = traj[:,5:7, np.newaxis]
+    om = np.matmul(M_inv, traj_reshape)
+    om = om[:,1].squeeze()
 
     ########## Code ends here ##########
 
